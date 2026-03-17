@@ -155,6 +155,10 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pactums ENABLE ROW LEVEL SECURITY;
 
 -- PROFILES policies
+DROP POLICY IF EXISTS "Profiles are viewable by authenticated users" ON profiles;
+DROP POLICY IF EXISTS "Users can insert their own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
+
 CREATE POLICY "Profiles are viewable by authenticated users"
   ON profiles FOR SELECT TO authenticated USING (TRUE);
 
@@ -165,6 +169,11 @@ CREATE POLICY "Users can update their own profile"
   ON profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
 
 -- IDEAS policies
+DROP POLICY IF EXISTS "Ideas are viewable by authenticated users" ON ideas;
+DROP POLICY IF EXISTS "Users can create ideas" ON ideas;
+DROP POLICY IF EXISTS "Users can update their own ideas" ON ideas;
+DROP POLICY IF EXISTS "Users can delete their own ideas" ON ideas;
+
 CREATE POLICY "Ideas are viewable by authenticated users"
   ON ideas FOR SELECT TO authenticated USING (TRUE);
 
@@ -178,6 +187,10 @@ CREATE POLICY "Users can delete their own ideas"
   ON ideas FOR DELETE TO authenticated USING (auth.uid() = owner_id);
 
 -- SWIPES policies
+DROP POLICY IF EXISTS "Users can view their own swipes" ON swipes;
+DROP POLICY IF EXISTS "Idea owners can view swipes on their ideas" ON swipes;
+DROP POLICY IF EXISTS "Users can create swipes" ON swipes;
+
 CREATE POLICY "Users can view their own swipes"
   ON swipes FOR SELECT TO authenticated USING (auth.uid() = swiper_id);
 
@@ -191,6 +204,10 @@ CREATE POLICY "Users can create swipes"
   ON swipes FOR INSERT TO authenticated WITH CHECK (auth.uid() = swiper_id);
 
 -- MATCHES policies
+DROP POLICY IF EXISTS "Users can view their own matches" ON matches;
+DROP POLICY IF EXISTS "Idea owners can create matches (approve/decline)" ON matches;
+DROP POLICY IF EXISTS "Idea owners can update match status" ON matches;
+
 CREATE POLICY "Users can view their own matches"
   ON matches FOR SELECT TO authenticated
   USING (auth.uid() = idea_owner_id OR auth.uid() = interested_user_id);
@@ -202,6 +219,10 @@ CREATE POLICY "Idea owners can update match status"
   ON matches FOR UPDATE TO authenticated USING (auth.uid() = idea_owner_id);
 
 -- MESSAGES policies
+DROP POLICY IF EXISTS "Match participants can view messages" ON messages;
+DROP POLICY IF EXISTS "Match participants can send messages" ON messages;
+DROP POLICY IF EXISTS "Sender can update their messages (mark read)" ON messages;
+
 CREATE POLICY "Match participants can view messages"
   ON messages FOR SELECT TO authenticated
   USING (EXISTS (
@@ -231,6 +252,10 @@ CREATE POLICY "Sender can update their messages (mark read)"
   ));
 
 -- PACTUMS policies
+DROP POLICY IF EXISTS "Match participants can view pactums" ON pactums;
+DROP POLICY IF EXISTS "Match participants can create pactums" ON pactums;
+DROP POLICY IF EXISTS "Match participants can update pactums (sign)" ON pactums;
+
 CREATE POLICY "Match participants can view pactums"
   ON pactums FOR SELECT TO authenticated
   USING (EXISTS (
@@ -263,5 +288,14 @@ CREATE POLICY "Match participants can update pactums (sign)"
 -- REALTIME SUBSCRIPTIONS
 -- ============================================================
 -- Enable realtime for messages and matches
-ALTER PUBLICATION supabase_realtime ADD TABLE messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE matches;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE matches;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
