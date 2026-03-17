@@ -27,13 +27,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
+  async function ensureProfile(user: User) {
+    const fallbackName =
+      typeof user.user_metadata?.full_name === "string" &&
+      user.user_metadata.full_name.trim().length > 0
+        ? user.user_metadata.full_name.trim()
+        : user.email?.split("@")[0] || "New User";
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          full_name: fallbackName,
+        },
+        { onConflict: "id" },
+      )
+      .select("*")
+      .single();
+
+    if (!error) {
+      setProfile(data);
+      return;
+    }
+
+    setProfile(null);
+  }
+
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
-      .single();
-    setProfile(data);
+      .maybeSingle();
+
+    if (error) {
+      setProfile(null);
+      return;
+    }
+
+    if (data) {
+      setProfile(data);
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user && user.id === userId) {
+      await ensureProfile(user);
+      return;
+    }
+
+    setProfile(null);
   }
 
   async function refreshProfile() {

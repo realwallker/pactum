@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS swipes (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS matches (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  idea_id UUID NOT NULL REFERENCES ideas(id) ON DELETE SET NULL,
+  idea_id UUID NOT NULL REFERENCES ideas(id) ON DELETE CASCADE,
   idea_owner_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   interested_user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'matched', 'declined')),
@@ -128,21 +128,34 @@ CREATE OR REPLACE TRIGGER update_pactums_updated_at
 -- ============================================================
 -- AUTO-CREATE PROFILE ON SIGNUP
 -- ============================================================
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
-  INSERT INTO profiles (id, full_name)
+  INSERT INTO public.profiles (id, full_name)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', 'New User')
+    COALESCE(
+      NULLIF(TRIM(NEW.raw_user_meta_data->>'full_name'), ''),
+      NULLIF(SPLIT_PART(NEW.email, '@', 1), ''),
+      'New User'
+    )
   );
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'handle_new_user failed for user %: %', NEW.id, SQLERRM;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================================
 -- ROW LEVEL SECURITY

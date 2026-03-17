@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -28,9 +29,10 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -42,8 +44,18 @@ export default function RegisterPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      router.push("/profile/setup");
-      router.refresh();
+      const hasSession = Boolean(data.session);
+
+      if (hasSession) {
+        router.push("/profile/setup");
+        router.refresh();
+        return;
+      }
+
+      setSuccess(
+        "Cuenta creada. Revisa tu correo para confirmar y luego inicia sesion.",
+      );
+      setLoading(false);
     }
   }
 
@@ -58,6 +70,11 @@ export default function RegisterPage() {
           {error && (
             <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">
               {error}
+            </div>
+          )}
+          {success && (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-3 py-2">
+              {success}
             </div>
           )}
           <div className="space-y-1.5">

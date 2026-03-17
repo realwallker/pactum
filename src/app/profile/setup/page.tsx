@@ -37,17 +37,25 @@ export default function ProfileSetupPage() {
     setError("");
     setLoading(true);
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        age: age ? parseInt(age) : null,
+    const fallbackName =
+      typeof user.user_metadata?.full_name === "string" &&
+      user.user_metadata.full_name.trim().length > 0
+        ? user.user_metadata.full_name.trim()
+        : user.email?.split("@")[0] || "New User";
+
+    const { error } = await supabase.from("profiles").upsert(
+      {
+        id: user.id,
+        full_name: fallbackName,
+        age: age ? parseInt(age, 10) : null,
         city: city || null,
         skills,
         interests,
         goals: goals || null,
         updated_at: new Date().toISOString(),
-      })
-      .eq("id", user.id);
+      },
+      { onConflict: "id" },
+    );
 
     if (error) {
       setError(error.message);
