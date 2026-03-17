@@ -19,7 +19,7 @@ interface IdeaFormProps {
 }
 
 export function IdeaForm({ idea, onSuccess, onCancel }: IdeaFormProps) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const supabase = createClient();
 
   const [title, setTitle] = useState(idea?.title ?? "");
@@ -32,8 +32,18 @@ export function IdeaForm({ idea, onSuccess, onCancel }: IdeaFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!user) return;
     setError("");
+
+    if (authLoading) {
+      setError("Authenticating your session, please try again in a moment.");
+      return;
+    }
+
+    if (!user) {
+      setError("Your session expired. Please sign in again.");
+      return;
+    }
+
     setLoading(true);
 
     if (idea) {
@@ -73,6 +83,7 @@ export function IdeaForm({ idea, onSuccess, onCancel }: IdeaFormProps) {
       }
     }
 
+    setLoading(false);
     onSuccess();
   }
 
@@ -130,7 +141,11 @@ export function IdeaForm({ idea, onSuccess, onCancel }: IdeaFormProps) {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="flex-1">
+            <Button
+              type="submit"
+              disabled={loading || authLoading}
+              className="flex-1"
+            >
               {loading ? (
                 <>
                   <Spinner size="sm" className="mr-2" />
